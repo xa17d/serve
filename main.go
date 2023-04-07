@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-var version = "0.1.0"
+var version = "0.1.1"
 var changePath = "/__changes_d49689c9-665a-4d1b-9e50-05c7b8f764d7" // Arbitrary path that is very unlikely to be used by a real file.
 
 func main() {
@@ -39,6 +39,8 @@ func main() {
 			if err != nil {
 				log.Panic(err)
 			}
+
+			w.Header().Add("Cache-Control", "no-store, must-revalidate")
 
 			w.Write([]byte(hex.EncodeToString(hash.Sum(nil))))
 		})
@@ -79,6 +81,8 @@ func (i JsInjectionInterceptor) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	w.Header().Del("Content-Length") // Remove Content-Length, because it'd be wrong after injection.
 
+	w.Header().Add("Expires", "0")
+
 	w.WriteHeader(inMemoryResponseWriter.statusCode)
 
 	if strings.HasPrefix(inMemoryResponseWriter.Header().Get("Content-Type"), "text/html") {
@@ -86,23 +90,20 @@ func (i JsInjectionInterceptor) ServeHTTP(w http.ResponseWriter, r *http.Request
 		async function getContent() {
 			return await (await fetch("` + changePath + `")).text()
 		}
-		
+
 		let lastContent = null;
-		
+
 		async function checkChanges() {
 			const newContent = await getContent()
 			if (lastContent == null) {
 				lastContent = newContent
 			}
 			if (newContent != lastContent) {
-				location.reload();
+				location.reload()
 			}
 		}
-		
-		function scheduleChangeCheck() {
-			setTimeout(() => { checkChanges(); scheduleChangeCheck() }, 1000)
-		}
-		scheduleChangeCheck()
+
+		setInterval(() => { checkChanges() }, 1000)
 		</script>`)
 
 		inMemoryResponseWriter.data = append(inMemoryResponseWriter.data, js...)
@@ -123,7 +124,7 @@ func (i *InMemoryResponseWriter) Header() http.Header {
 
 func (i *InMemoryResponseWriter) Write(data []byte) (int, error) {
 	i.data = append(i.data, data...)
-	return 0, nil
+	return len(data), nil
 }
 
 func (i *InMemoryResponseWriter) WriteHeader(statusCode int) {
