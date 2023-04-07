@@ -10,15 +10,18 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/browser"
 )
 
-var version = "0.1.1"
+var version = "0.2.0"
 var changePath = "/__changes_d49689c9-665a-4d1b-9e50-05c7b8f764d7" // Arbitrary path that is very unlikely to be used by a real file.
 
 func main() {
 	address := flag.String("address", "localhost:3000", "Address of the server")
 	folder := flag.String("folder", ".", "Folder that should be served")
 	autoRefresh := flag.Bool("auto-refresh", true, "Inject JavaScript into HTML pages that automatically reloads when a file in the specified folder changes.")
+	open := flag.Bool("open", true, "Opens the server address in the default browser on startup")
 	flag.Parse()
 
 	handler := http.FileServer(http.Dir(*folder))
@@ -51,6 +54,13 @@ func main() {
 	http.Handle("/", handler)
 
 	println("\x1b[34mserve " + version + "\x1b[0m")
+
+	if *open {
+		var url = "http://" + *address
+		log.Print("Opening \"" + url + "\"...")
+		browser.OpenURL(url)
+	}
+
 	log.Print("Listening on " + *address + " to serve \"" + *folder + "\" with auto-refresh \"" + strconv.FormatBool(*autoRefresh) + "\"...")
 	err := http.ListenAndServe(*address, nil)
 	if err != nil {
